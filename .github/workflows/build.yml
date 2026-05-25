@@ -20,212 +20,49 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Download dependencies
-        run: |
-          mkdir -p libs
-          # NeoForge userdev (contains decompiled MC + NF sources for compilation)
-          curl -sL "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.0.109-beta/neoforge-21.0.109-beta-userdev.jar" -o libs/neoforge-userdev.jar
-          # NeoForge universal (the actual mod jar)
-          curl -sL "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.0.109-beta/neoforge-21.0.109-beta-universal.jar" -o libs/neoforge-universal.jar
-          # Ars Nouveau
-          curl -sL "https://maven.blamejared.com/com/hollingsworth/arsnouveau/ars_nouveau-1.21.1/5.10.6/ars_nouveau-1.21.1-5.10.6.jar" -o libs/ars_nouveau.jar
-          echo "Downloaded dependencies:"
-          ls -lh libs/
+      - name: Setup Gradle (no cache - fresh build)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache: 'disabled'
 
-      - name: Set up compilation classpath
-        run: |
-          echo "=== Setting up compilation classpath ==="
-          
-          # The userdev jar contains a Gradle script that sets up the dev environment
-          # For direct javac, we need to construct the classpath from NeoForge's libraries
-          mkdir -p nf-extract
-          cd nf-extract
-          jar xf ../libs/neoforge-userdev.jar 2>/dev/null || unzip -q ../libs/neoforge-userdev.jar 2>/dev/null || true
-          echo "Userdev contents:"
-          find . -type f | head -30
-          cd ..
-          
-          # Download NeoForge's runtime libraries from the moddev config
-          LIBS_DIR="$HOME/.neoforge-libs"
-          mkdir -p "$LIBS_DIR"
-          
-          # Read library list from moddev config and download each one
-          if [ -f nf-extract/neoforge-21.0.109-beta-moddev-config.json ]; then
-            echo "Found moddev-config.json"
-            python3 -c "
-          import json, urllib.request, os
-          with open('nf-extract/neoforge-21.0.109-beta-moddev-config.json') as f:
-              cfg = json.load(f)
-          libs = cfg.get('libraries', [])
-          print(f'Found {len(libs)} libraries in moddev config')
-          for lib in libs:
-              # Parse Maven coordinates
-              parts = lib.split(':')
-              if len(parts) >= 3:
-                  group = parts[0].replace('.', '/')
-                  artifact = parts[1]
-                  version = parts[2].replace('@jar','').replace('@zip','')
-                  ext = 'jar' if '@jar' in parts[2] else 'zip'
-                  url = f'https://maven.neoforged.net/releases/{group}/{artifact}/{version}/{artifact}-{version}.{ext}'
-                  filename = f'{LIBS_DIR}/{artifact}-{version}.jar'
-                  if not os.path.exists(filename):
-                      try:
-                          urllib.request.urlretrieve(url, filename)
-                          print(f'  Downloaded: {artifact}-{version}')
-                      except Exception as e:
-                          print(f'  Failed: {artifact}-{version}: {e}')
-                  else:
-                      print(f'  Cached: {artifact}-{version}')
-          " 2>&1
-          else
-            echo "No moddev config found, downloading common NF libraries directly..."
-            NF_LIBS=(
-              "cpw.mods:modlauncher:11.0.4"
-              "cpw.mods:bootstraplauncher:2.0.2"
-              "org.ow2.asm:asm:9.5"
-              "org.ow2.asm:asm-tree:9.5"
-              "org.ow2.asm:asm-commons:9.5"
-              "net.neoforged:accesstransformers:10.0.1"
-              "net.neoforged:coremods:7.0.3"
-            )
-            for lib in "${NF_LIBS[@]}"; do
-              IFS=':' read -r group artifact version <<< "$lib"
-              group_path=$(echo "$group" | tr '.' '/')
-              url="https://maven.neoforged.net/releases/${group_path}/${artifact}/${version}/${artifact}-${version}.jar"
-              outfile="$LIBS_DIR/${artifact}-${version}.jar"
-              curl -sL "$url" -o "$outfile" 2>/dev/null && echo "Downloaded: $artifact-$version" || echo "Failed: $artifact-$version"
-            done
-          fi
-          
-          # Also download Minecraft libraries
-          MC_LIBS=(
-            "com.mojang:authlib:6.0.54"
-            "com.mojang:brigadier:1.3.10"
-            "com.mojang:datafixerupper:8.0.16"
-            "com.mojang:logging:1.2.0"
-            "com.google.code.gson:gson:2.11.0"
-            "com.google.guava:guava:33.0.0-jre"
-            "org.apache.commons:commons-lang3:3.14.0"
-            "net.neoforged.fancymodloader:loader:4.0.18"
-            "net.neoforged.fancymodloader:earlydisplay:4.0.18"
-          )
-          for lib in "${MC_LIBS[@]}"; do
-            IFS=':' read -r group artifact version <<< "$lib"
-            group_path=$(echo "$group" | tr '.' '/')
-            url="https://maven.neoforged.net/releases/${group_path}/${artifact}/${version}/${artifact}-${version}.jar"
-            outfile="$LIBS_DIR/${artifact}-${version}.jar"
-            curl -sL "$url" -o "$outfile" 2>/dev/null && echo "Downloaded MC lib: $artifact-$version" || true
-          done
-          
-          echo ""
-          echo "All downloaded libraries:"
-          ls -1 "$LIBS_DIR/" | wc -l
-          echo "files"
+      - name: Grant execute permission
+        run: chmod +x gradlew
 
-      - name: Build mod JAR
+      - name: Build with Gradle
+        run: ./gradlew build --no-daemon --stacktrace 2>&1
         env:
           JAVA_TOOL_OPTIONS: "-Xmx3G"
+
+      - name: Show build outputs
+        if: always()
         run: |
-          echo "=== Building Overflow Codex Mod JAR ==="
-          
-          mkdir -p build/classes build/resources
-          
-          # Build classpath from all downloaded jars
-          LIBS_DIR="$HOME/.neoforge-libs"
-          CLASSPATH="libs/neoforge-universal.jar:libs/ars_nouveau.jar"
-          for jar in "$LIBS_DIR"/*.jar; do
-            CLASSPATH="$CLASSPATH:$jar"
-          done
-          
-          echo "Classpath has $(echo $CLASSPATH | tr ':' '\n' | wc -l) entries"
-          echo "Compiling Java sources..."
-          
-          find src/main/java -name "*.java" > sources.txt
-          SOURCE_COUNT=$(wc -l < sources.txt)
-          echo "Found $SOURCE_COUNT Java source files"
-          
-          javac -J-Xmx3G -Xlint:none -encoding UTF-8 \
-            -cp "$CLASSPATH" \
-            -d build/classes \
-            @sources.txt 2>&1 | tee compile.log
-          
-          CLASS_COUNT=$(find build/classes -name "*.class" 2>/dev/null | wc -l)
-          echo "Compiled $CLASS_COUNT class files"
-          
-          # If full compilation failed, compile what we can
-          if [ "$CLASS_COUNT" -eq 0 ]; then
-            echo "Full compilation failed. Compiling individual files..."
-            mkdir -p build/classes
-            
-            # Try each file individually to maximize what compiles
-            ERRORS=$(head -20 compile.log | grep "error:" | grep -oP '[^/]+\.java' | sort -u)
-            echo "Errors in files:"
-            echo "$ERRORS"
-            
-            # Remove files with errors and compile the rest
-            cp sources.txt sources-all.txt
-            for f in $ERRORS; do
-              grep -v "$f" sources-all.txt > sources-clean.txt
-              mv sources-clean.txt sources-all.txt
-            done
-            
-            if [ -s sources-all.txt ]; then
-              CLEAN_COUNT=$(wc -l < sources-all.txt)
-              echo "Attempting to compile $CLEAN_COUNT clean files..."
-              javac -J-Xmx3G -Xlint:none -encoding UTF-8 \
-                -cp "$CLASSPATH" \
-                -d build/classes \
-                @sources-all.txt 2>&1 | tee compile-retry.log || true
-            fi
-            
-            CLASS_COUNT=$(find build/classes -name "*.class" 2>/dev/null | wc -l)
-            echo "Retry: Compiled $CLASS_COUNT class files"
-          fi
-          
-          # Copy resources
-          cp -r src/main/resources/* build/resources/ 2>/dev/null || true
-          
-          # Create the mod JAR
-          mkdir -p build/libs
-          cd build
-          jar cf libs/overflow_codex-1.0.0.jar \
-            -C classes . \
-            -C resources . \
-            2>&1
-          cd ..
-          
-          JAR_SIZE=$(stat -c%s build/libs/overflow_codex-1.0.0.jar 2>/dev/null || echo "0")
-          echo "JAR size: $JAR_SIZE bytes"
-          ls -lh build/libs/
-          
-          # Always create a JAR even if compilation partially fails
-          # (runtime resolution will handle missing dependencies)
-          if [ "$JAR_SIZE" -lt 1000 ]; then
-            echo "JAR too small, creating resource-only JAR..."
-            cd build
-            jar cf libs/overflow_codex-1.0.0.jar -C resources . 2>&1
-            cd ..
-            ls -lh build/libs/
-          fi
+          echo "=== Build output ==="
+          ls -laR build/libs/ 2>/dev/null || echo "No build/libs"
+          echo ""
+          echo "=== JAR files ==="
+          find . -name "*.jar" -not -path "./.git/*" -not -path "./libs/*" -not -path "./gradle/*" 2>/dev/null
 
       - name: Upload artifact (JAR)
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: overflow-codex-jar
-          path: build/libs/*.jar
+          path: |
+            build/libs/*.jar
+            **/build/libs/*.jar
           retention-days: 30
+          if-no-files-found: warn
 
       - name: Build summary
         if: always()
         run: |
           echo "## Build Result" >> $GITHUB_STEP_SUMMARY
-          if ls build/libs/*.jar 1>/dev/null 2>&1; then
-            echo "✅ JAR produced:" >> $GITHUB_STEP_SUMMARY
-            ls -lh build/libs/*.jar >> $GITHUB_STEP_SUMMARY
+          JARS=$(find . -name "*.jar" -not -path "./.git/*" -not -path "./libs/*" -not -path "./gradle/*" 2>/dev/null)
+          if [ -n "$JARS" ]; then
+            echo "✅ JAR files produced:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            ls -lhR build/libs/ >> $GITHUB_STEP_SUMMARY 2>/dev/null
+            echo '```' >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ No JAR produced" >> $GITHUB_STEP_SUMMARY
+            echo "❌ No JAR produced. Build may need dependency fixes." >> $GITHUB_STEP_SUMMARY
           fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Compilation Log (last 50 lines)" >> $GITHUB_STEP_SUMMARY
-          tail -50 compile.log >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No compile log" >> $GITHUB_STEP_SUMMARY
