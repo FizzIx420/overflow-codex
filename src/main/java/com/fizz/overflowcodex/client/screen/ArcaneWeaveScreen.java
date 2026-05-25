@@ -14,7 +14,7 @@ import net.minecraft.resources.ResourceLocation;
 
 public class ArcaneWeaveScreen extends Screen {
     private static final ResourceLocation BACKGROUND =
-            new ResourceLocation("overflow_codex", "textures/gui/arcane_weave_background.png");
+            ResourceLocation.fromNamespaceAndPath("overflow_codex", "textures/gui/arcane_weave_background.png");
 
     private static final int GLYPH_SLOTS = OverflowCodexItem.MAX_GLYPHS;
     private static final int SLOTS_PER_ROW = 10;
@@ -70,7 +70,7 @@ public class ArcaneWeaveScreen extends Screen {
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
-        RenderSystem.setShader(GameRenderer::getPositionTexColorProgram);
+        RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
         RenderSystem.setShaderTexture(0, BACKGROUND);
         guiGraphics.blit(BACKGROUND, canvasX - 10, canvasY - 10, 0, 0, 280, this.height - 80, 280, this.height - 80);
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 8, 0xFFD700);
@@ -191,12 +191,12 @@ public class ArcaneWeaveScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta, double scrollAmount) {
         if (mouseX >= scrollBarX - 20 && mouseX <= scrollBarX + 30) {
             scrollGlyphPalette(delta > 0 ? -1 : 1);
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, delta);
+        return super.mouseScrolled(mouseX, mouseY, delta, scrollAmount);
     }
 
     private void scrollGlyphPalette(int direction) {

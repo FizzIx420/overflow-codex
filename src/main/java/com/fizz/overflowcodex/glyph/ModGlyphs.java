@@ -17,7 +17,7 @@ public class ModGlyphs {
         public final String bookDescription;
 
         public GlyphDef(String name, String displayName, int manaCost, int tier, String desc) {
-            this.registryName = new ResourceLocation(OverflowCodex.MOD_ID, "glyph_" + name);
+            this.registryName = ResourceLocation.fromNamespaceAndPath(OverflowCodex.MOD_ID, "glyph_" + name);
             this.displayName = displayName;
             this.manaCost = manaCost;
             this.tier = tier;

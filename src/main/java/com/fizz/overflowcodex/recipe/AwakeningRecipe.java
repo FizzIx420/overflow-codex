@@ -1,33 +1,62 @@
 package com.fizz.overflowcodex.recipe;
 
-import com.fizz.overflowcodex.OverflowCodex;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.SimpleContainer;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.*;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeInput;
+import net.minecraft.world.item.crafting.RecipeSerializer;
+import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 
-import java.util.ArrayList;
-import java.util.List;
+public class AwakeningRecipe implements Recipe<RecipeInput> {
+    public static final MapCodec<AwakeningRecipe> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            Ingredient.CODEC.listOf().fieldOf("pedestal_ingredients", NonNullList::of).forGetter(r -> r.pedestalIngredients),
+            Ingredient.CODEC.fieldOf("source_gem", Ingredient::EMPTY).forGetter(r -> r.sourceGem),
+            ItemStack.ITEM_CODEC.fieldOf("result", ItemStack::EMPTY).forGetter(r -> r.result),
+            net.minecraft.network.codec.StreamCodec.INT.fieldOf("mana_cost", 50000).forGetter(r -> r.manaCost)
+    ).apply(instance, AwakeningRecipe::new));
 
-public class AwakeningRecipe implements Recipe<SimpleContainer> {
+    public static final StreamCodec<RegistryFriendlyByteBuf, AwakeningRecipe> STREAM_CODEC = StreamCodec.of(
+            (buf) -> {
+                int size = buf.readVarInt();
+                NonNullList<Ingredient> pedestals = NonNullList.create();
+                for (int i = 0; i < size; i++) {
+                    pedestals.add(Ingredient.CONTENTS_STREAM_CODEC.decode(buf));
+                }
+                Ingredient sourceGem = Ingredient.CONTENTS_STREAM_CODEC.decode(buf);
+                ItemStack result = ItemStack.STREAM_CODEC.decode(buf);
+                int manaCost = buf.readVarInt();
+                return new AwakeningRecipe(pedestals, sourceGem, result, manaCost);
+            },
+            (buf, recipe) -> {
+                buf.writeVarInt(recipe.pedestalIngredients.size());
+                for (Ingredient ing : recipe.pedestalIngredients) {
+                    Ingredient.CONTENTS_STREAM_CODEC.encode(buf, ing);
+                }
+                Ingredient.CONTENTS_STREAM_CODEC.encode(buf, recipe.sourceGem);
+                ItemStack.STREAM_CODEC.encode(buf, recipe.result);
+                buf.writeVarInt(recipe.manaCost);
+            }
+    );
+
+    public static final Type TYPE = new Type();
     public static final Serializer SERIALIZER = new Serializer();
-    private final ResourceLocation id;
+
     private final NonNullList<Ingredient> pedestalIngredients;
     private final Ingredient sourceGem;
     private final ItemStack result;
     private final int manaCost;
 
-    public AwakeningRecipe(ResourceLocation id, NonNullList<Ingredient> pedestalIngredients,
+    public AwakeningRecipe(NonNullList<Ingredient> pedestalIngredients,
                            Ingredient sourceGem, ItemStack result, int manaCost) {
-        this.id = id;
         this.pedestalIngredients = pedestalIngredients;
         this.sourceGem = sourceGem;
         this.result = result;
@@ -35,13 +64,12 @@ public class AwakeningRecipe implements Recipe<SimpleContainer> {
     }
 
     @Override
-    public boolean matches(SimpleContainer container, Level level) {
-        // Simplified matching - actual Ars Nouveau integration would check the apparatus
+    public boolean matches(RecipeInput container, Level level) {
         return true;
     }
 
     @Override
-    public ItemStack assemble(SimpleContainer container, RegistryAccess access) {
+    public ItemStack assemble(RecipeInput container, HolderLookup.Provider registries) {
         return result.copy();
     }
 
@@ -51,7 +79,7 @@ public class AwakeningRecipe implements Recipe<SimpleContainer> {
     }
 
     @Override
-    public ItemStack getResultItem(RegistryAccess access) {
+    public ItemStack getResultItem(HolderLookup.Provider registries) {
         return result;
     }
 
@@ -62,54 +90,35 @@ public class AwakeningRecipe implements Recipe<SimpleContainer> {
 
     @Override
     public RecipeType<?> getType() {
-        return RecipeType.BREWING; // Placeholder; real impl uses Ars Nouveau apparatus type
+        return TYPE;
     }
 
     public NonNullList<Ingredient> getPedestalIngredients() { return pedestalIngredients; }
     public Ingredient getSourceGem() { return sourceGem; }
     public int getManaCost() { return manaCost; }
 
+    public static class Type implements RecipeType<AwakeningRecipe> {
+        public static final MapCodec<AwakeningRecipe> CODEC = RecordCodecBuilder.mapCodec(
+                instance -> instance.group(
+                        AwakeningRecipe.CODEC.forGetter(r -> r)
+                ).apply(instance, (r) -> r)
+        );
+
+        @Override
+        public MapCodec<AwakeningRecipe> codec() {
+            return CODEC;
+        }
+    }
+
     public static class Serializer implements RecipeSerializer<AwakeningRecipe> {
         @Override
-        public AwakeningRecipe fromJson(ResourceLocation id, JsonObject json) {
-            JsonArray pedestalArray = json.getAsJsonArray("pedestal_ingredients");
-            NonNullList<Ingredient> pedestals = NonNullList.create();
-            for (JsonElement element : pedestalArray) {
-                pedestals.add(Ingredient.fromJson(element));
-            }
-
-            Ingredient sourceGem = Ingredient.fromJson(json.getAsJsonObject("source_gem"));
-            JsonObject resultObj = json.getAsJsonObject("result");
-            Item resultItem = net.minecraft.core.registries.BuiltInRegistries.ITEM
-                    .get(new ResourceLocation(resultObj.get("item").getAsString()));
-            ItemStack result = new ItemStack(resultItem, resultObj.has("count") ? resultObj.get("count").getAsInt() : 1);
-            int manaCost = json.has("mana_cost") ? json.get("mana_cost").getAsInt() : 50000;
-
-            return new AwakeningRecipe(id, pedestals, sourceGem, result, manaCost);
+        public MapCodec<AwakeningRecipe> codec() {
+            return AwakeningRecipe.CODEC;
         }
 
         @Override
-        public AwakeningRecipe fromNetwork(ResourceLocation id, FriendlyByteBuf buf) {
-            int size = buf.readVarInt();
-            NonNullList<Ingredient> pedestals = NonNullList.create();
-            for (int i = 0; i < size; i++) {
-                pedestals.add(Ingredient.fromNetwork(buf));
-            }
-            Ingredient sourceGem = Ingredient.fromNetwork(buf);
-            ItemStack result = buf.readItem();
-            int manaCost = buf.readVarInt();
-            return new AwakeningRecipe(id, pedestals, sourceGem, result, manaCost);
-        }
-
-        @Override
-        public void toNetwork(FriendlyByteBuf buf, AwakeningRecipe recipe) {
-            buf.writeVarInt(recipe.pedestalIngredients.size());
-            for (Ingredient ing : recipe.pedestalIngredients) {
-                ing.toNetwork(buf);
-            }
-            recipe.sourceGem.toNetwork(buf);
-            buf.writeItem(recipe.result);
-            buf.writeVarInt(recipe.manaCost);
+        public StreamCodec<RegistryFriendlyByteBuf, AwakeningRecipe> streamCodec() {
+            return AwakeningRecipe.STREAM_CODEC;
         }
     }
 }
