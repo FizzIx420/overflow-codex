@@ -23,18 +23,34 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Debug plugin resolution
-        run: ./gradlew buildEnvironment --no-daemon --info 2>&1 | head -200
+      - name: Test basic Java build
+        run: |
+          echo "=== Gradle version ==="
+          ./gradlew --version --no-daemon
+          echo ""
+          echo "=== Cat build.gradle ==="
+          cat build.gradle
+          echo ""
+          echo "=== Cat settings.gradle ==="
+          cat settings.gradle
+          echo ""
+          echo "=== Test: ./gradlew tasks --all ==="
+          ./gradlew tasks --all --no-daemon 2>&1 | head -100
+          echo ""
+          echo "=== Test: ./gradlew buildEnvironment --no-daemon 2>&1 ==="
+          ./gradlew buildEnvironment --no-daemon 2>&1
 
-      - name: Build with Gradle
-        run: ./gradlew build --no-daemon --stacktrace 2>&1
+      - name: Build
+        run: ./gradlew jar --no-daemon --stacktrace 2>&1
 
-      - name: List all build outputs
-        run: find build/ -type f 2>/dev/null || echo "No build dir"
+      - name: List outputs
+        run: find build/ -type f 2>/dev/null | head -20 || echo "No build dir"
 
-      - name: Upload any JARs
+      - name: Upload JARs
         uses: actions/upload-artifact@v4
         with:
           name: overflow-codex-mod
-          path: build/libs/*.jar
+          path: |
+            build/libs/*.jar
+            build/**/*.jar
           if-no-files-found: warn
