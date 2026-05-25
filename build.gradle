@@ -31,10 +31,6 @@ repositories {
         url = 'https://maven.minecraftforge.net/'
     }
 
-    maven {
-        url = 'https://modmuss50.me/releases'
-    }
-
     mavenCentral()
 }
 
@@ -72,7 +68,9 @@ neoForge {
 }
 
 dependencies {
-    implementation "com.hollingsworth.arsnouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}"
+    // Ars Nouveau: compileOnly since we use reflection for AN API calls
+    // Players install AN separately as a runtime mod dependency
+    compileOnly "com.hollingsworth.arsnouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}"
 }
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }

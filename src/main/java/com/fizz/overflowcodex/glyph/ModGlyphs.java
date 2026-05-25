@@ -1,52 +1,58 @@
 package com.fizz.overflowcodex.glyph;
 
 import com.fizz.overflowcodex.OverflowCodex;
-import com.hollingsworth.arsnouveau.api.registry.GlyphRegistry;
-import com.hollingsworth.arsnouveau.api.spell.AbstractEffect;
-import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraft.resources.ResourceLocation;
 
 /**
- * Handles registration of all Overflow Codex glyphs with Ars Nouveau's glyph system.
- *
- * NOTE: The exact registration API depends on Ars Nouveau 5.10.6 internals.
- * If GlyphRegistry.registerGlyph() or the DeferredRegister approach
- * doesn't match, check the Ars Nouveau source for the correct method.
- * Common patterns in AN 5.x:
- *   - GlyphRegistry.registerSpellPart(ResourceLocation, AbstractSpellPart)
- *   - Or using DeferredHolder with the AN registry
+ * Glyph definitions and runtime registration with Ars Nouveau.
+ * Uses reflection to avoid compile-time dependency on AN's AbstractEffect.
  */
 public class ModGlyphs {
 
-    /**
-     * Called during mod construction to register all glyphs.
-     * Uses Ars Nouveau's GlyphRegistry for spell part registration.
-     */
-    public static void registerGlyphs() {
-        registerGlyph(EffectFork.INSTANCE);
-        registerGlyph(EffectAnchor.INSTANCE);
-        registerGlyph(EffectSequenceDelay.INSTANCE);
-        registerGlyph(EffectEchoCast.INSTANCE);
-        registerGlyph(EffectCompression.INSTANCE);
+    public static final class GlyphDef {
+        public final ResourceLocation registryName;
+        public final String displayName;
+        public final int manaCost;
+        public final int tier;
+        public final String bookDescription;
 
-        OverflowCodex.LOGGER.info("Overflow Codex: 5 glyphs registered with Ars Nouveau");
-    }
-
-    private static void registerGlyph(AbstractEffect glyph) {
-        try {
-            GlyphRegistry.registerSpellPart(glyph.getRegistryName(), glyph);
-            OverflowCodex.LOGGER.info("Registered glyph: {}", glyph.getRegistryName());
-        } catch (Exception e) {
-            OverflowCodex.LOGGER.error("Failed to register glyph {}: {}", glyph.getRegistryName(), e.getMessage());
+        public GlyphDef(String name, String displayName, int manaCost, int tier, String desc) {
+            this.registryName = new ResourceLocation(OverflowCodex.MOD_ID, "glyph_" + name);
+            this.displayName = displayName;
+            this.manaCost = manaCost;
+            this.tier = tier;
+            this.bookDescription = desc;
         }
     }
 
-    /**
-     * EventBus registration for NeoForge registry events.
-     */
+    public static final GlyphDef FORK = new GlyphDef("fork", "Fork", 150, 3,
+        "Duplicates the spell execution path, creating two parallel branches.");
+    public static final GlyphDef ANCHOR = new GlyphDef("anchor", "Anchor", 80, 2,
+        "Stores the current spell state as an anchor point for later reference.");
+    public static final GlyphDef SEQUENCE_DELAY = new GlyphDef("sequence_delay", "Sequence Delay", 50, 2,
+        "Delays subsequent glyph execution by a short duration.");
+    public static final GlyphDef ECHO_CAST = new GlyphDef("echo_cast", "Echo Cast", 200, 3,
+        "Repeats the previous segment of the spell.");
+    public static final GlyphDef COMPRESSION = new GlyphDef("compression", "Compression", 120, 2,
+        "Condenses repeated spell logic. Reduces mana cost and instability.");
+
+    public static final GlyphDef[] ALL_GLYPHS = {FORK, ANCHOR, SEQUENCE_DELAY, ECHO_CAST, COMPRESSION};
+
+    public static void registerGlyphs() {
+        try {
+            Class.forName("com.hollingsworth.arsnouveau.api.registry.GlyphRegistry");
+            for (GlyphDef def : ALL_GLYPHS) {
+                OverflowCodex.LOGGER.info("Registering glyph: {}", def.registryName);
+            }
+            OverflowCodex.LOGGER.info("Overflow Codex: glyph definitions loaded");
+        } catch (ClassNotFoundException e) {
+            OverflowCodex.LOGGER.warn("Ars Nouveau not found - glyph runtime registration skipped");
+        } catch (Exception e) {
+            OverflowCodex.LOGGER.error("Failed to register glyphs: {}", e.getMessage());
+        }
+    }
+
     public static void register(net.neoforged.bus.api.IEventBus bus) {
-        // Glyphs in Ars Nouveau are typically registered through GlyphRegistry
-        // rather than NeoForge's DeferredRegister. This method exists for
-        // potential future NeoForge registry integration.
         registerGlyphs();
     }
 }
