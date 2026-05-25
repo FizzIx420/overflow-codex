@@ -20,32 +20,25 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-disabled: 'true'
-
-      - name: Grant execute permission
-        run: chmod +x gradlew
-
-      - name: Show Gradle tasks
-        run: ./gradlew tasks --no-daemon 2>&1 || true
-
       - name: Build with Gradle
         run: |
+          chmod +x gradlew
+          echo "=== Gradle Version ==="
+          ./gradlew --version 2>&1 | head -5
+          echo ""
+          echo "=== Available Tasks ==="
+          ./gradlew tasks --all --no-daemon 2>&1 | head -40
+          echo ""
+          echo "=== Running Build ==="
           ./gradlew build --no-daemon --stacktrace 2>&1
-          echo "EXIT_CODE=$?"
+          echo ""
+          echo "=== Exit code: $? ==="
+          echo ""
+          echo "=== Build Outputs ==="
+          find build/libs -type f 2>/dev/null || echo "No build/libs"
+          ls -lhR build/ 2>/dev/null || echo "No build dir"
         env:
           JAVA_TOOL_OPTIONS: "-Xmx3G"
-
-      - name: Show build outputs
-        if: always()
-        run: |
-          echo "=== Files in build/libs ==="
-          find build/libs -type f 2>/dev/null || echo "  (empty or missing)"
-          echo ""
-          echo "=== All .jar files ==="
-          find . -name "*.jar" -not -path "./.git/*" -not -path "./gradle/*" -type f 2>/dev/null || echo "  none"
 
       - name: Upload artifact (JAR)
         uses: actions/upload-artifact@v4
