@@ -10,8 +10,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.TooltipContext;
 import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -35,7 +35,7 @@ public class OverflowCodexItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, @Nullable TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("tooltip.overflow_codex.awakened.line1")
                 .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
         tooltip.add(Component.translatable("tooltip.overflow_codex.awakened.line2")
@@ -48,7 +48,7 @@ public class OverflowCodexItem extends Item {
                 .withStyle(ChatFormatting.DARK_AQUA));
         tooltip.add(Component.translatable("tooltip.overflow_codex.awakened.warning")
                 .withStyle(ChatFormatting.RED, ChatFormatting.ITALIC));
-        super.appendHoverText(stack, level, tooltip, flag);
+        super.appendHoverText(stack, context, tooltip, flag);
     }
 
     @Override

@@ -5,9 +5,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
@@ -16,36 +14,16 @@ import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class AwakeningRecipe implements Recipe<RecipeInput> {
     public static final MapCodec<AwakeningRecipe> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Ingredient.CODEC.listOf().fieldOf("pedestal_ingredients", NonNullList::of).forGetter(r -> r.pedestalIngredients),
+            Ingredient.CODEC.listOf().fieldOf("pedestal_ingredients").forGetter(r -> r.pedestalIngredients),
             Ingredient.CODEC.fieldOf("source_gem", Ingredient::EMPTY).forGetter(r -> r.sourceGem),
             ItemStack.ITEM_CODEC.fieldOf("result", ItemStack::EMPTY).forGetter(r -> r.result),
-            net.minecraft.network.codec.StreamCodec.INT.fieldOf("mana_cost", 50000).forGetter(r -> r.manaCost)
+            com.mojang.serialization.Codec.INT.optionalFieldOf("mana_cost", 50000).forGetter(r -> r.manaCost)
     ).apply(instance, AwakeningRecipe::new));
-
-    public static final StreamCodec<RegistryFriendlyByteBuf, AwakeningRecipe> STREAM_CODEC = StreamCodec.of(
-            (buf) -> {
-                int size = buf.readVarInt();
-                NonNullList<Ingredient> pedestals = NonNullList.create();
-                for (int i = 0; i < size; i++) {
-                    pedestals.add(Ingredient.CONTENTS_STREAM_CODEC.decode(buf));
-                }
-                Ingredient sourceGem = Ingredient.CONTENTS_STREAM_CODEC.decode(buf);
-                ItemStack result = ItemStack.STREAM_CODEC.decode(buf);
-                int manaCost = buf.readVarInt();
-                return new AwakeningRecipe(pedestals, sourceGem, result, manaCost);
-            },
-            (buf, recipe) -> {
-                buf.writeVarInt(recipe.pedestalIngredients.size());
-                for (Ingredient ing : recipe.pedestalIngredients) {
-                    Ingredient.CONTENTS_STREAM_CODEC.encode(buf, ing);
-                }
-                Ingredient.CONTENTS_STREAM_CODEC.encode(buf, recipe.sourceGem);
-                ItemStack.STREAM_CODEC.encode(buf, recipe.result);
-                buf.writeVarInt(recipe.manaCost);
-            }
-    );
 
     public static final Type TYPE = new Type();
     public static final Serializer SERIALIZER = new Serializer();
@@ -111,6 +89,31 @@ public class AwakeningRecipe implements Recipe<RecipeInput> {
     }
 
     public static class Serializer implements RecipeSerializer<AwakeningRecipe> {
+        private static StreamCodec<RegistryFriendlyByteBuf, AwakeningRecipe> makeStreamCodec() {
+            return StreamCodec.of(
+                    (buf) -> {
+                        int size = buf.readVarInt();
+                        NonNullList<Ingredient> pedestals = NonNullList.create();
+                        for (int i = 0; i < size; i++) {
+                            pedestals.add(Ingredient.CONTENTS_STREAM_CODEC.decode(buf));
+                        }
+                        Ingredient sourceGem = Ingredient.CONTENTS_STREAM_CODEC.decode(buf);
+                        ItemStack result = ItemStack.STREAM_CODEC.decode(buf);
+                        int manaCost = buf.readVarInt();
+                        return new AwakeningRecipe(pedestals, sourceGem, result, manaCost);
+                    },
+                    (buf, recipe) -> {
+                        buf.writeVarInt(recipe.pedestalIngredients.size());
+                        for (Ingredient ing : recipe.pedestalIngredients) {
+                            Ingredient.CONTENTS_STREAM_CODEC.encode(buf, ing);
+                        }
+                        Ingredient.CONTENTS_STREAM_CODEC.encode(buf, recipe.sourceGem);
+                        ItemStack.STREAM_CODEC.encode(buf, recipe.result);
+                        buf.writeVarInt(recipe.manaCost);
+                    }
+            );
+        }
+
         @Override
         public MapCodec<AwakeningRecipe> codec() {
             return AwakeningRecipe.CODEC;
@@ -118,7 +121,7 @@ public class AwakeningRecipe implements Recipe<RecipeInput> {
 
         @Override
         public StreamCodec<RegistryFriendlyByteBuf, AwakeningRecipe> streamCodec() {
-            return AwakeningRecipe.STREAM_CODEC;
+            return makeStreamCodec();
         }
     }
 }
