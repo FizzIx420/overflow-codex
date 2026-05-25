@@ -20,49 +20,38 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Setup Gradle (no cache - fresh build)
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache: 'disabled'
+          cache-disabled: 'true'
 
       - name: Grant execute permission
         run: chmod +x gradlew
 
+      - name: Show Gradle tasks
+        run: ./gradlew tasks --no-daemon 2>&1 || true
+
       - name: Build with Gradle
-        run: ./gradlew build --no-daemon --stacktrace 2>&1
+        run: |
+          ./gradlew build --no-daemon --stacktrace 2>&1
+          echo "EXIT_CODE=$?"
         env:
           JAVA_TOOL_OPTIONS: "-Xmx3G"
 
       - name: Show build outputs
         if: always()
         run: |
-          echo "=== Build output ==="
-          ls -laR build/libs/ 2>/dev/null || echo "No build/libs"
+          echo "=== Files in build/libs ==="
+          find build/libs -type f 2>/dev/null || echo "  (empty or missing)"
           echo ""
-          echo "=== JAR files ==="
-          find . -name "*.jar" -not -path "./.git/*" -not -path "./libs/*" -not -path "./gradle/*" 2>/dev/null
+          echo "=== All .jar files ==="
+          find . -name "*.jar" -not -path "./.git/*" -not -path "./gradle/*" -type f 2>/dev/null || echo "  none"
 
       - name: Upload artifact (JAR)
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: overflow-codex-jar
-          path: |
-            build/libs/*.jar
-            **/build/libs/*.jar
+          path: build/libs/*.jar
           retention-days: 30
           if-no-files-found: warn
-
-      - name: Build summary
-        if: always()
-        run: |
-          echo "## Build Result" >> $GITHUB_STEP_SUMMARY
-          JARS=$(find . -name "*.jar" -not -path "./.git/*" -not -path "./libs/*" -not -path "./gradle/*" 2>/dev/null)
-          if [ -n "$JARS" ]; then
-            echo "✅ JAR files produced:" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            ls -lhR build/libs/ >> $GITHUB_STEP_SUMMARY 2>/dev/null
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ No JAR produced. Build may need dependency fixes." >> $GITHUB_STEP_SUMMARY
-          fi
