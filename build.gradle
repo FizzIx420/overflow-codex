@@ -3,7 +3,7 @@ plugins {
     id 'eclipse'
     id 'idea'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.28-beta'
+    id 'net.neoforged.moddev' version '2.0.115'
 }
 
 version = mod_version
@@ -25,10 +25,6 @@ repositories {
         content {
             includeGroup 'curse.maven'
         }
-    }
-
-    maven {
-        url = 'https://maven.minecraftforge.net/'
     }
 
     mavenCentral()
@@ -68,8 +64,6 @@ neoForge {
 }
 
 dependencies {
-    // Ars Nouveau: compileOnly since we use reflection for AN API calls
-    // Players install AN separately as a runtime mod dependency
     compileOnly "com.hollingsworth.arsnouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}"
 }
 
