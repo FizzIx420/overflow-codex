@@ -5,7 +5,7 @@ import net.neoforged.bus.api.IEventBus;
 
 public class ModRecipes {
     public static void register(IEventBus bus) {
-        AwakeningRecipe.TYPE; // Ensure class is loaded
+        // Recipe types are statically registered via their serializers
         OverflowCodex.LOGGER.info("Overflow Codex recipe types registered");
     }
 }
