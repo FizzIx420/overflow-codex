@@ -11,21 +11,6 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
-runs {
-    configureEach {
-        systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
-    }
-    client {
-        client()
-    }
-    server {
-        server()
-        programArgument '--nogui'
-    }
-}
-
-sourceSets.main.resources { srcDir 'src/generated/resources' }
-
 jar {
     manifest {
         attributes([
