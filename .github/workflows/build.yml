@@ -33,8 +33,11 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: List available tasks
+        run: ./gradlew tasks --all 2>&1 | head -60
+
       - name: Build with Gradle
-        run: ./gradlew build --stacktrace 2>&1 | tee /tmp/gradle-build.log
+        run: ./gradlew build --stacktrace --info 2>&1 | tee /tmp/gradle-build.log
         env:
           GRADLE_OPTS: "-Xmx4G"
 
@@ -42,10 +45,9 @@ jobs:
         if: always()
         run: |
           echo "## Build Result" >> $GITHUB_STEP_SUMMARY
+          ls -lhR build/libs/ 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "No build/libs" >> $GITHUB_STEP_SUMMARY
+          find build/ -name "*.jar" 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "No JARs" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          ls -lh build/libs/*.jar 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "No JAR produced" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Gradle Output (last 100 lines)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           tail -100 /tmp/gradle-build.log >> $GITHUB_STEP_SUMMARY 2>/dev/null
           echo '```' >> $GITHUB_STEP_SUMMARY
@@ -55,6 +57,8 @@ jobs:
         if: always()
         with:
           name: overflow-codex-jar
-          path: build/libs/*.jar
+          path: |
+            build/libs/*.jar
+            build/repositories/**/*.jar
           retention-days: 30
           if-no-files-found: warn
