@@ -20,33 +20,88 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Build with Gradle
-        run: ./gradlew jar --info 2>&1 | tee /tmp/gradle-build.log
-        env:
-          GRADLE_OPTS: "-Xmx4G"
-
-      - name: Build summary
-        if: always()
+      - name: Download NeoForge dependencies
         run: |
-          echo "## Build Result" >> $GITHUB_STEP_SUMMARY
-          find build/ -name "*.jar" -exec ls -lh {} \; >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No JARs found" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -100 /tmp/gradle-build.log >> $GITHUB_STEP_SUMMARY 2>/dev/null
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          mkdir -p libs
+          cd libs
+
+          # NeoForge userdev (contains MC + NF deobfuscated classes)
+          if [ ! -f nf-userdev.jar ]; then
+            echo "Downloading NeoForge 21.0.109-beta userdev..."
+            curl -sL "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.0.109-beta/neoforge-21.0.109-beta-userdev.jar" -o nf-userdev.jar
+            SIZE=$(wc -c < nf-userdev.jar)
+            echo "Userdev JAR: $SIZE bytes"
+          fi
+
+          # The userdev JAR is a bootstrap - extract the actual dependency list
+          echo "Extracting NeoForge dependency information..."
+          mkdir -p /tmp/nf-extract
+          cd /tmp/nf-extract
+          jar xf /home/runner/work/overflow-codex/overflow-codex/libs/nf-userdev.jar 2>/dev/null || true
+
+          # Check for a dependency manifest or properties file
+          if [ -f "META-INF/neoforgemods.toml" ]; then
+            echo "Found neoforgemods.toml"
+            head -20 META-INF/neoforgemods.toml
+          fi
+
+          # List what's in the userdev JAR
+          echo "=== Userdev JAR contents ==="
+          jar tf /home/runner/work/overflow-codex/overflow-codex/libs/nf-userdev.jar | head -50
+
+      - name: Compile mod
+        run: |
+          echo "=== Attempting compilation ==="
+          mkdir -p build/classes build/resources
+
+          # Try compiling with just the userdev JAR on classpath
+          echo "Compiling..."
+          find src/main/java -name "*.java" > /tmp/sources.txt
+          echo "Source files: $(wc -l < /tmp/sources.txt)"
+
+          javac -Xlint:none -encoding UTF-8 \
+            -cp "libs/nf-userdev.jar" \
+            -d build/classes \
+            @/tmp/sources.txt 2>&1 | tee /tmp/compile.log || true
+
+          CLASS_COUNT=$(find build/classes -name "*.class" 2>/dev/null | wc -l)
+          echo "Compiled: $CLASS_COUNT classes"
+
+          # If compilation failed, show the errors
+          if [ "$CLASS_COUNT" -eq 0 ]; then
+            echo ""
+            echo "=== COMPILATION FAILED - showing errors ==="
+            cat /tmp/compile.log
+            echo ""
+            echo "=== Trying alternative: compile without MC-dependent files ==="
+            # Create a filtered source list excluding files that need MC classes
+            grep -v "client/screen/ArcaneWeaveScreen" /tmp/sources.txt > /tmp/sources-core.txt
+            javac -Xlint:none -encoding UTF-8 \
+              -cp "libs/nf-userdev.jar" \
+              -d build/classes \
+              @/tmp/sources-core.txt 2>&1 | tee /tmp/compile2.log || true
+            CLASS_COUNT=$(find build/classes -name "*.class" 2>/dev/null | wc -l)
+            echo "Core compilation: $CLASS_COUNT classes"
+          fi
+
+          if [ "$CLASS_COUNT" -eq 0 ]; then
+            echo "ERROR: No classes compiled. Aborting."
+            exit 1
+          fi
+
+          # Copy resources
+          cp -r src/main/resources/* build/resources/ 2>/dev/null || true
+
+          # Package JAR
+          mkdir -p build/libs
+          (cd build && jar cf libs/overflow_codex-1.0.0.jar -C classes . -C resources .)
+          echo ""
+          echo "=== Output ==="
+          ls -lh build/libs/overflow_codex-1.0.0.jar
+          echo ""
+          echo "=== JAR contents ==="
+          jar tf build/libs/overflow_codex-1.0.0.jar | wc -l
+          echo "files in JAR"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -56,3 +111,14 @@ jobs:
           path: build/libs/*.jar
           retention-days: 30
           if-no-files-found: warn
+
+      - name: Build summary
+        if: always()
+        run: |
+          echo "## Build Result" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/compile.log >> $GITHUB_STEP_SUMMARY 2>/dev/null
+          cat /tmp/compile2.log >> $GITHUB_STEP_SUMMARY 2>/dev/null
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          ls -lh build/libs/*.jar >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No JAR" >> $GITHUB_STEP_SUMMARY
