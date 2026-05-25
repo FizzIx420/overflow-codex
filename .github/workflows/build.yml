@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -20,18 +20,33 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Test basic Gradle
-        run: |
-          chmod +x gradlew
-          echo "=== Test 1: gradlew --version ==="
-          ./gradlew --version
-          echo ""
-          echo "=== Test 2: gradlew tasks ==="
-          ./gradlew tasks 2>&1
-          echo ""
-          echo "=== Test 3: gradlew build ==="
-          ./gradlew build 2>&1
-          echo ""
-          echo "=== Test 4: Check for JARs ==="
-          find build/ -name "*.jar" -ls 2>/dev/null || echo "No JARs"
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
+      - name: Build with Gradle
+        run: ./gradlew build --no-daemon --stacktrace 2>&1
+
+      - name: List build outputs
+        run: find build/ -name "*.jar" -ls 2>/dev/null || echo "No JARs found"
+
+      - name: Upload mod JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: overflow-codex-mod
+          path: build/libs/overflow_codex-*.jar
+          if-no-files-found: warn
+
+      - name: Create Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ github.run_number }}"
+          name: "Overflow Codex Build #${{ github.run_number }}"
+          body: |
+            Automated build from commit ${{ github.sha }}
+            NeoForge 21.0.109-beta | Minecraft 1.21.1
+          files: build/libs/overflow_codex-*.jar
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
