@@ -30,7 +30,12 @@ jobs:
           echo "NeoForge Userdev: $(du -h libs/neoforge-userdev.jar | cut -f1)"
 
           # Ars Nouveau (v5.9.4.1182 for MC 1.21.1)
-          curl -sL "https://maven.blamejared.com/com/hollingsworth/arsnouveau/ars_nouveau-1.21.1/5.9.4.1182/ars_nouveau-1.21.1-5.9.4.1182.jar" -o libs/ars_nouveau.jar
+          curl -L --fail-with-body -o libs/ars_nouveau.jar "https://maven.blamejared.com/com/hollingsworth/arsnouveau/ars_nouveau-1.21.1/5.9.4.1182/ars_nouveau-1.21.1-5.9.4.1182.jar"
+          AN_SIZE=$(wc -c < libs/ars_nouveau.jar)
+          if [ "$AN_SIZE" -lt 100000 ]; then
+            echo "WARNING: Ars Nouveau download seems too small ($AN_SIZE bytes), trying CurseMaven..."
+            curl -L -o libs/ars_nouveau.jar "https://cursemaven.com/ars_nouveau/5359139/ars_nouveau-1.21.1-5.10.6.jar" 2>/dev/null || true
+          fi
           echo "Ars Nouveau: $(du -h libs/ars_nouveau.jar | cut -f1)"
 
           echo ""
