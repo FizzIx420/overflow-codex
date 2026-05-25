@@ -29,8 +29,8 @@ jobs:
           curl -sL "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.0.109-beta/neoforge-21.0.109-beta-universal.jar" -o libs/neoforge.jar
           echo "NeoForge: $(du -h libs/neoforge.jar | cut -f1)"
 
-          # Ars Nouveau
-          curl -sL "https://maven.blamejared.com/com/hollingsworth/arsnouveau/ars_nouveau-1.21.1/5.10.6/ars_nouveau-1.21.1-5.10.6.jar" -o libs/ars_nouveau.jar
+          # Ars Nouveau (v5.9.4.1182 for MC 1.21.1)
+          curl -sL "https://maven.blamejared.com/com/hollingsworth/arsnouveau/ars_nouveau-1.21.1/5.9.4.1182/ars_nouveau-1.21.1-5.9.4.1182.jar" -o libs/ars_nouveau.jar
           echo "Ars Nouveau: $(du -h libs/ars_nouveau.jar | cut -f1)"
 
           # NeoForm (decompiled MC sources - use as sourcepath)
