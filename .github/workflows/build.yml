@@ -20,37 +20,20 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Setup Gradle 8.8
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
 
-      - name: Test basic Java build
-        run: |
-          echo "=== Gradle version ==="
-          ./gradlew --version --no-daemon
-          echo ""
-          echo "=== Cat build.gradle ==="
-          cat build.gradle
-          echo ""
-          echo "=== Cat settings.gradle ==="
-          cat settings.gradle
-          echo ""
-          echo "=== Test: ./gradlew tasks --all ==="
-          ./gradlew tasks --all --no-daemon 2>&1 | head -100
-          echo ""
-          echo "=== Test: ./gradlew buildEnvironment --no-daemon 2>&1 ==="
-          ./gradlew buildEnvironment --no-daemon 2>&1
-
-      - name: Build
-        run: ./gradlew jar --no-daemon --stacktrace 2>&1
+      - name: Build with Gradle
+        run: gradle build --no-daemon --stacktrace 2>&1
 
       - name: List outputs
-        run: find build/ -type f 2>/dev/null | head -20 || echo "No build dir"
+        run: find build/ -name "*.jar" -exec ls -la {} \;
 
       - name: Upload JARs
         uses: actions/upload-artifact@v4
         with:
           name: overflow-codex-mod
-          path: |
-            build/libs/*.jar
-            build/**/*.jar
+          path: build/libs/*.jar
           if-no-files-found: warn
