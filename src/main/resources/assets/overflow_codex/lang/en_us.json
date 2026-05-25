@@ -1,0 +1,54 @@
+{
+  "itemGroup.overflow_codex": "Overflow Codex",
+
+  "item.overflow_codex.dormant_overflow_codex": "Dormant Overflow Codex",
+  "item.overflow_codex.overflow_codex": "Overflow Codex",
+
+  "tooltip.overflow_codex.dormant.line1": "A spellbook sealed by the Archmages.",
+  "tooltip.overflow_codex.dormant.line2": "It pulses with dormant arcane power. Requires awakening.",
+  "tooltip.overflow_codex.dormant.line3": "\"Some books were never meant to be read.\"",
+
+  "tooltip.overflow_codex.awakened.line1": "Overflow Codex",
+  "tooltip.overflow_codex.awakened.line2": "Up to 30 glyphs per spell.",
+  "tooltip.overflow_codex.awakened.line3": "Mana cost scales beyond 10 glyphs.",
+  "tooltip.overflow_codex.awakened.line4": "Complexity instability above 15 glyphs.",
+  "tooltip.overflow_codex.awakened.line5": "Max 3 Fork, 2 Echo glyphs per spell.",
+  "tooltip.overflow_codex.awakened.warning": "WARNING: Excessive complexity may cause spell misfire.",
+
+  "screen.overflow_codex.arcane_weave": "Arcane Weave Interface",
+  "screen.overflow_codex.spell_name": "Spell Name",
+  "screen.overflow_codex.save": "Save",
+  "screen.overflow_codex.clear": "Clear",
+  "screen.overflow_codex.test": "Test",
+  "screen.overflow_codex.mana_cost": "Mana Cost: %d",
+  "screen.overflow_codex.glyph_palette": "Glyph Palette",
+  "screen.overflow_codex.complexity": "Complexity",
+
+  "glyph.overflow_codex.glyph_fork": "Fork",
+  "glyph.overflow_codex.glyph_anchor": "Anchor",
+  "glyph.overflow_codex.glyph_sequence_delay": "Sequence Delay",
+  "glyph.overflow_codex.glyph_echo_cast": "Echo Cast",
+  "glyph.overflow_codex.glyph_compression": "Compression",
+
+  "glyph_desc.overflow_codex.glyph_fork": "Duplicates the spell execution path, creating two parallel branches. Each branch executes independently. Extremely mana intensive. Maximum 3 per spell.",
+  "glyph_desc.overflow_codex.glyph_anchor": "Stores the current spell state as an anchor point. Other glyphs later in the chain can reference this point. Essential for complex spell architectures.",
+  "glyph_desc.overflow_codex.glyph_sequence_delay": "Delays subsequent glyph execution by a short duration. Amplify increases the delay. Duration extends the delayed chain length. Enables spell choreography and timed sequences.",
+  "glyph_desc.overflow_codex.glyph_echo_cast": "Repeats the previous segment of the spell. Dangerous when combined with recursive or fork chains. Maximum 2 echo glyphs per spell. Each echo amplification increases the repeat count.",
+  "glyph_desc.overflow_codex.glyph_compression": "Condenses repeated spell logic into a single compressed node. Reduces mana cost by 50%% and lowers spell instability for the following glyphs. Essential for managing 30-glyph spell stability.",
+
+  "recipe.overflow_codex.awakening": "Awakening of the Overflow Codex",
+  "recipe.overflow_codex.awakening.desc": "A ritual of transcendent power. The Dormant Overflow Codex drinks from every essence, tempered by AllTheModium and the soul lava of another dimension.",
+
+  "jei.overflow_codex.dormant_overflow_codex": "Dormant Overflow Codex",
+  "jei.overflow_codex.dormant_overflow_codex.desc": "A spellbook that should not exist. The Archmages sealed this design after realizing the spell chains began developing recursive behavior beyond mortal comprehension. Craft with AllTheModium, the Archmage Spellbook, and objects of immense power.",
+  "jei.overflow_codex.overflow_codex": "Overflow Codex",
+  "jei.overflow_codex.overflow_codex.desc": "The awakened Overflow Codex. Capable of holding 30 glyphs per spell. Open with right-click to access the Arcane Weave Interface.",
+
+  "message.overflow_codex.awakening_success": "The Overflow Codex awakens! Reality shudders as glyphic limits dissolve.",
+  "message.overflow_codex.instability_warning": "Your spell is approaching critical instability! Consider using Compression glyphs.",
+  "message.overflow_codex.limit_exceeded": "Spell limit exceeded: maximum %d glyphs allowed.",
+  "message.overflow_codex.fork_limit": "Cannot add more Fork glyphs. Maximum 3 per spell.",
+  "message.overflow_codex.echo_limit": "Cannot add more Echo Cast glyphs. Maximum 2 per spell.",
+  "message.overflow_codex.spell_saved": "Spell saved successfully.",
+  "message.overflow_codex.spell_cleared": "Spell cleared."
+}

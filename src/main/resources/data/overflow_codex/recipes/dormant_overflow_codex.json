@@ -1,0 +1,32 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "ATA",
+    "SBR",
+    "ATD"
+  ],
+  "key": {
+    "A": {
+      "item": "allthemodium:allthemodium_ingot"
+    },
+    "T": {
+      "item": "minecraft:elytra"
+    },
+    "S": {
+      "item": "minecraft:nether_star"
+    },
+    "B": {
+      "item": "ars_nouveau:archmage_spellbook"
+    },
+    "R": {
+      "item": "minecraft:sculk_shrieker"
+    },
+    "D": {
+      "item": "minecraft:dragon_head"
+    }
+  },
+  "result": {
+    "id": "overflow_codex:dormant_overflow_codex",
+    "count": 1
+  }
+}

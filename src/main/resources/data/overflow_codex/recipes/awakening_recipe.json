@@ -1,0 +1,22 @@
+{
+  "type": "overflow_codex:awakening",
+  "pedestal_ingredients": [
+    { "item": "ars_nouveau:fire_essence" },
+    { "item": "ars_nouveau:water_essence" },
+    { "item": "ars_nouveau:air_essence" },
+    { "item": "ars_nouveau:earth_essence" },
+    { "item": "ars_nouveau:manipulation_essence" },
+    { "item": "ars_nouveau:conjuration_essence" },
+    { "item": "ars_nouveau:abjuration_essence" },
+    { "item": "allthemodium:allthemodium_smithing_template" },
+    { "item": "allthemodium:soul_lava_bucket" }
+  ],
+  "source_gem": {
+    "item": "ars_nouveau:source_gem"
+  },
+  "result": {
+    "item": "overflow_codex:overflow_codex",
+    "count": 1
+  },
+  "mana_cost": 50000
+}

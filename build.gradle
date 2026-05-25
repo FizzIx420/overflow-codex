@@ -1,0 +1,138 @@
+plugins {
+    id 'java-library'
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.neoforged.moddev' version '2.0.28-beta'
+}
+
+version = mod_version
+group = mod_group_id
+
+repositories {
+    mavenLocal()
+
+    maven {
+        url = 'https://maven.blamejared.com/'
+        content {
+            includeGroup 'com.hollingsworth'
+            includeGroup 'com.hollingsworth.arsnouveau'
+        }
+    }
+
+    maven {
+        url = 'https://cursemaven.com/'
+        content {
+            includeGroup 'curse.maven'
+        }
+    }
+
+    maven {
+        url = 'https://maven.minecraftforge.net/'
+    }
+
+    maven {
+        url = 'https://modmuss50.me/releases'
+    }
+
+    maven {
+        url = 'https://maven.minecraftforge.net/'
+        content {
+            includeGroup 'net.minecraftforge'
+        }
+    }
+
+    maven {
+        url = 'https://thedarkcolour.github.io/KotlinForForge/'
+    }
+
+    maven {
+        name = 'AllTheMods Maven'
+        url = 'https://maven.allthemods.com/releases/'
+        content {
+            includeGroup 'com.allthemods'
+        }
+    }
+
+    mavenCentral()
+}
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neoforge_version
+
+    parchment {
+        mappingsVersion = project.parchment_version
+        minecraftVersion = project.parchment_minecraft
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    // Compile against Ars Nouveau
+    implementation "com.hollingsworth.arsnouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}"
+
+    // Compile against AllTheModium (optional - for crafting integration)
+    // Note: ATM may not be on public maven, so we handle it via reflection at runtime
+    // implementation "curse.maven:allthemodium-366708:${allthemodium_version}"
+
+    // For JEI/EMI integration (optional)
+    // compileOnly "mezz.jei:jei-${minecraft_version}-common-api:19.0.0"
+    // compileOnly "mezz.jei:jei-${minecraft_version}-forge-api:19.0.0"
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+tasks.withType(ProcessResources).configureEach {
+    var replaceProperties = [
+        minecraft_version   : minecraft_version, minecraft_version_range: '[1.21.1,)',
+        neo_version         : neoforge_version, neo_version_range: '[21.0.109,)',
+        loader_version_range: '[4,)',
+        mod_id              : mod_id, mod_name: mod_name, mod_license: 'MIT',
+        mod_version         : mod_version, mod_authors: mod_authors,
+        mod_description     : mod_description
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/repo"
+        }
+    }
+}

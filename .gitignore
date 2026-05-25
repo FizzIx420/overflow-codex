@@ -1,0 +1,29 @@
+# Build output
+build/
+!build/.gitkeep
+out/
+
+# Gradle
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python texture generator (dev tool)
+generate_textures.py
+
+# Secrets
+*.key
+*.pem
