@@ -15,101 +15,148 @@ jobs:
           distribution: 'temurin'
       - name: Download dependencies
         run: |
+          set -e
           mkdir -p libs
-          # NeoForge userdev (contains patched MC + NF classes)
-          curl -sL "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.0.109-beta/neoforge-21.0.109-beta-userdev.jar" -o libs/neoforge-userdev.jar
-          echo "NeoForge: $(du -h libs/neoforge-userdev.jar | cut -f1)"
-
-          # Ars Nouveau - try multiple sources, validate download
-          echo "Downloading Ars Nouveau..."
-          curl -L -o libs/ars_nouveau.jar "https://maven.blamejared.com/com/hollingsworth/arsnouveau/ars_nouveau-1.21.1/5.9.4.1182/ars_nouveau-1.21.1-5.9.4.1182.jar" 2>/dev/null || true
-          # Validate: must be a valid zip and > 100KB
-          if ! unzip -t libs/ars_nouveau.jar >/dev/null 2>&1 || [ "$(wc -c < libs/ars_nouveau.jar)" -lt 100000 ]; then
-            echo "  blamejared failed, trying CurseMaven..."
-            rm -f libs/ars_nouveau.jar
-            curl -L -o libs/ars_nouveau.jar "https://cursemaven.com/ars_nouveau/5359139/ars_nouveau-1.21.1-5.10.6.jar" 2>/dev/null || true
-          fi
-          if ! unzip -t libs/ars_nouveau.jar >/dev/null 2>&1; then
-            echo "  CurseMaven also failed, removing AN jar (mod will work without AN integration)"
-            rm -f libs/ars_nouveau.jar
-          else
-            echo "Ars Nouveau: $(du -h libs/ars_nouveau.jar | cut -f1)"
+          echo "=== Downloading NeoForge userdev ==="
+          # The userdev jar is ~70MB. If we get < 50MB, it's a redirect/error.
+          curl -sL -f "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.0.109-beta/neoforge-21.0.109-beta-userdev.jar" -o libs/neoforge-userdev.jar
+          NF_SIZE=$(stat -c%s libs/neoforge-userdev.jar || echo 0)
+          echo "NeoForge userdev: $NF_SIZE bytes"
+          if [ "$NF_SIZE" -lt 50000000 ]; then
+            echo "NeoForge userdev too small, trying alternative URL..."
+            rm -f libs/neoforge-userdev.jar
+            curl -sL -f "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.0.109-beta/neoforge-21.0.109-beta-universal.jar" -o libs/neoforge.jar
+            NF2_SIZE=$(stat -c%s libs/neoforge.jar || echo 0)
+            echo "NeoForge universal: $NF2_SIZE bytes"
           fi
 
-          # Runtime libraries
-          LIBS=(
-            "cpw.mods:modlauncher:11.0.4" "cpw.mods:bootstraplauncher:2.0.2"
-            "net.neoforged:accesstransformers:10.0.1" "net.neoforged:coremods:7.0.3"
-            "net.neoforged.fancymodloader:loader:4.0.18" "net.neoforged.fancymodloader:earlydisplay:4.0.18"
-            "org.ow2.asm:asm:9.5" "org.ow2.asm:asm-tree:9.5" "org.ow2.asm:asm-commons:9.5"
-            "net.neoforged.accesstransformers:at-modlauncher:10.0.1"
-            "org.openjdk.nashorn:nashorn-core:15.4"
-            "com.google.guava:guava:33.0.0-jre" "com.google.code.gson:gson:2.11.0"
-            "org.apache.commons:commons-lang3:3.14.0"
-            "com.mojang:brigadier:1.3.10" "com.mojang:logging:1.2.0"
-            "com.mojang:authlib:6.0.54" "com.mojang:datafixerupper:8.0.16"
-            "net.minecraftforge:binarypatcher:1.1.1"
-            "com.google.errorprone:error_prone_annotations:2.23.0"
-            "org.jetbrains:annotations:24.1.0"
+          echo "=== Downloading Mojang libraries from Maven Central ==="
+          MOJANG_LIBS=(
+            "com.mojang:brigadier:1.3.10"
+            "com.mojang:logging:1.2.0"
+            "com.mojang:authlib:6.0.54"
+            "com.mojang:datafixerupper:8.0.16"
+            "com.mojang:text2:1.21.1"
           )
-          for lib in "${LIBS[@]}"; do
+          for lib in "${MOJANG_LIBS[@]}"; do
+            IFS=':' read -r g a v <<< "$lib"; p=$(echo "$g" | tr '.' '/')
+            curl -sL -f "https://repo1.maven.org/maven2/${p}/${a}/${v}/${a}-${v}.jar" -o "libs/${a}-${v}.jar" 2>/dev/null || true
+          done
+
+          echo "=== Downloading NeoForge libs ==="
+          NF_LIBS=(
+            "cpw.mods:modlauncher:11.0.4"
+            "cpw.mods:bootstraplauncher:2.0.2"
+            "net.neoforged:accesstransformers:10.0.1"
+            "net.neoforged:coremods:7.0.3"
+            "net.neoforged.fancymodloader:loader:4.0.18"
+            "net.neoforged.fancymodloader:earlydisplay:4.0.18"
+            "net.neoforged.accesstransformers:at-modlauncher:10.0.1"
+          )
+          for lib in "${NF_LIBS[@]}"; do
             IFS=':' read -r g a v <<< "$lib"; p=$(echo "$g" | tr '.' '/')
             curl -sL "https://maven.neoforged.net/releases/${p}/${a}/${v}/${a}-${v}.jar" -o "libs/${a}-${v}.jar" 2>/dev/null || true
           done
 
-          # Remove any invalid jars (not valid zips)
-          echo "Validating jars..."
+          echo "=== Downloading other libraries ==="
+          OTHER_LIBS=(
+            "org.ow2.asm:asm:9.7" "org.ow2.asm:asm-tree:9.7" "org.ow2.asm:asm-commons:9.7"
+            "org.openjdk.nashorn:nashorn-core:15.4"
+            "com.google.guava:guava:33.0.0-jre" "com.google.code.gson:gson:2.11.0"
+            "org.apache.commons:commons-lang3:3.14.0"
+            "net.minecraftforge:binarypatcher:1.1.1" "net.minecraftforge:installertools:1.5.0"
+            "com.google.errorprone:error_prone_annotations:2.23.0"
+            "org.jetbrains:annotations:24.1.0"
+          )
+          for lib in "${OTHER_LIBS[@]}"; do
+            IFS=':' read -r g a v <<< "$lib"; p=$(echo "$g" | tr '.' '/')
+            curl -sL "https://repo1.maven.org/maven2/${p}/${a}/${v}/${a}-${v}.jar" -o "libs/${a}-${v}.jar" 2>/dev/null || true
+          done
+
+          echo "=== Validating jars ==="
+          VALID_COUNT=0
           for j in libs/*.jar; do
-            if ! unzip -t "$j" >/dev/null 2>&1; then
-              echo "  Removing invalid: $(basename $j)"
+            SIZE=$(stat -c%s "$j" 2>/dev/null || echo 0)
+            if [ "$SIZE" -lt 1000 ] || ! unzip -t "$j" >/dev/null 2>&1; then
+              echo "  Removing invalid/tiny: $(basename $j) ($SIZE bytes)"
               rm -f "$j"
+            else
+              VALID_COUNT=$((VALID_COUNT + 1))
             fi
           done
-          echo "Valid JARs: $(ls libs/*.jar 2>/dev/null | wc -l)"
+          echo "Valid JARs: $VALID_COUNT"
+          echo "Contents:"
+          ls -lhS libs/*.jar 2>/dev/null | awk '{print "  " $5, $9}'
 
       - name: Compile and package
         run: |
+          set +e
           mkdir -p build/classes build/resources
+
           # Build classpath from valid jars only
-          CP=$(ls libs/*.jar 2>/dev/null | tr '\n' ':')
-          echo "Classpath has $(echo $CP | tr ':' '\n' | wc -l) jars"
+          CP=""
+          for j in libs/*.jar; do
+            CP="${CP}${j}:"
+          done
+          echo "Classpath jars: $(ls libs/*.jar | wc -l)"
 
           # First attempt: compile everything
+          echo ""
           echo "=== Compiling all source files ==="
           find src/main/java -name "*.java" > /tmp/src.txt
-          javac -J-Xmx3G -Xlint:none -encoding UTF-8 -cp "$CP" -d build/classes @/tmp/src.txt 2>&1 | tee /tmp/compile.log || true
+          echo "Source files: $(wc -l < /tmp/src.txt)"
+          javac -J-Xmx3G -Xlint:none -encoding UTF-8 \
+            --add-exports java.base/jdk.internal.misc=ALL-UNNAMED \
+            -cp "$CP" -d build/classes @/tmp/src.txt 2>&1 | tee /tmp/compile.log
           OK=$(find build/classes -name "*.class" | wc -l)
           echo "Compiled: $OK classes"
 
-          # If full compile failed, retry without the new integration/event/effects files
+          # If full compile failed, try without client screen
           if [ "$OK" -eq 0 ]; then
-            echo "=== Full compile failed, retrying without integration/event/effects ==="
+            echo ""
+            echo "=== Full compile failed. Errors:"
+            grep "error:" /tmp/compile.log | head -5
+            echo ""
+            echo "Retrying without client/screen files..."
             rm -rf build/classes/*
-            grep -v -E "(integration/|event/ModEvents|glyph/effects/)" /tmp/src.txt > /tmp/src2.txt
-            javac -J-Xmx3G -Xlint:none -encoding UTF-8 -cp "$CP" -d build/classes @/tmp/src2.txt 2>&1 | tee /tmp/compile2.log || true
+            grep -v -E "(client/screen/ArcaneWeaveScreen)" /tmp/src.txt > /tmp/src2.txt
+            javac -J-Xmx3G -Xlint:none -encoding UTF-8 \
+              --add-exports java.base/jdk.internal.misc=ALL-UNNAMED \
+              -cp "$CP" -d build/classes @/tmp/src2.txt 2>&1 | tee /tmp/compile2.log
             OK=$(find build/classes -name "*.class" | wc -l)
-            echo "Retry: $OK classes"
+            echo "Retry without screen: $OK classes"
 
-            # List compiled classes
-            echo "Classes:"
-            find build/classes -name "*.class" | sed 's|build/classes/||' | sort
+            # If still failed, try without integration/event/effects too
+            if [ "$OK" -eq 0 ]; then
+              echo ""
+              echo "Still failing, trying core only..."
+              rm -rf build/classes/*
+              grep -v -E "(client/screen|integration/|event/ModEvents|glyph/effects/)" /tmp/src.txt > /tmp/src3.txt
+              javac -J-Xmx3G -Xlint:none -encoding UTF-8 \
+                --add-exports java.base/jdk.internal.misc=ALL-UNNAMED \
+                -cp "$CP" -d build/classes @/tmp/src3.txt 2>&1 | tee /tmp/compile3.log
+              OK=$(find build/classes -name "*.class" | wc -l)
+              echo "Core only: $OK classes"
+            fi
           fi
+
+          echo ""
+          echo "=== Compiled classes ==="
+          find build/classes -name "*.class" | sed 's|build/classes/||' | sort
 
           # Copy resources
           cp -r src/main/resources/* build/resources/ 2>/dev/null || true
 
           # Package JAR
           mkdir -p build/libs
-          (cd build && jar cf libs/overflow_codex-1.0.0.jar -C classes . -C resources .)
+          (cd build && jar cf libs/overflow_codex-1.0.0.jar -C classes . -C resources . 2>/dev/null)
 
-          # Fix toml [[mods]] → [ods]] corruption inside the jar
+          # Fix toml corruption: [ods]] -> [[mods]]
           cd /tmp && rm -rf tf && mkdir -p tf && cd tf
           jar xf /home/runner/work/overflow-codex/overflow-codex/build/libs/overflow_codex-1.0.0.jar META-INF/neoforge.mods.toml 2>/dev/null || true
           if [ -f "META-INF/neoforge.mods.toml" ]; then
-            # Fix: [ods]] should be [[mods]], [dependencies.X] should be [[dependencies.X]]
             sed -i 's/\[ods\]\]/[[mods]]/g' META-INF/neoforge.mods.toml
             sed -i 's/^\[dependencies\.\([a-z_]*\)\]$/[[dependencies.\1]]/g' META-INF/neoforge.mods.toml
-            echo "TOML first 5 lines:"
             head -5 META-INF/neoforge.mods.toml
             jar uf /home/runner/work/overflow-codex/overflow-codex/build/libs/overflow_codex-1.0.0.jar META-INF/neoforge.mods.toml
           fi
@@ -117,9 +164,6 @@ jobs:
           echo ""
           echo "=== Final JAR ==="
           ls -lh /home/runner/work/overflow-codex/overflow-codex/build/libs/
-          echo ""
-          echo "Classes in JAR:"
-          (cd /home/runner/work/overflow-codex/overflow-codex && jar tf build/libs/overflow_codex-1.0.0.jar | grep '\.class$' | sort)
 
       - uses: actions/upload-artifact@v4
         if: always()
