@@ -4,11 +4,13 @@ import com.fizz.overflowcodex.item.ModItems;
 import com.fizz.overflowcodex.glyph.ModGlyphs;
 import com.fizz.overflowcodex.recipe.ModRecipes;
 import com.fizz.overflowcodex.network.ModNetwork;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,8 +35,20 @@ public class OverflowCodex {
         ModNetwork.register();
 
         // Lifecycle hooks
+        modEventBus.addListener(this::registerNetwork);
         modEventBus.addListener(this::commonSetup);
         NeoForge.EVENT_BUS.addListener(this::onServerStarting);
+    }
+
+    /**
+     * Helper to create namespaced ResourceLocations.
+     */
+    public static ResourceLocation id(String path) {
+        return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
+    }
+
+    private void registerNetwork(RegisterPayloadHandlersEvent event) {
+        ModNetwork.register(event);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {

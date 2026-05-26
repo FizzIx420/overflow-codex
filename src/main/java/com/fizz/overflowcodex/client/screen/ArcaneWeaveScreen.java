@@ -1,6 +1,7 @@
 package com.fizz.overflowcodex.client.screen;
 
 import com.fizz.overflowcodex.OverflowCodex;
+import com.fizz.overflowcodex.glyph.ModGlyphs;
 import com.fizz.overflowcodex.item.OverflowCodexItem;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -11,6 +12,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 
 public class ArcaneWeaveScreen extends Screen {
     private static final ResourceLocation BACKGROUND =
@@ -28,6 +30,7 @@ public class ArcaneWeaveScreen extends Screen {
     private int manaCostDisplay = 0;
     private float instabilityDisplay = 0.0f;
     private EditBox spellNameField;
+    private ItemStack codexStack = ItemStack.EMPTY;
 
     private int canvasX, canvasY;
     private int scrollBarX, scrollBarY, scrollBarHeight;
@@ -40,9 +43,27 @@ public class ArcaneWeaveScreen extends Screen {
         Minecraft.getInstance().setScreen(new ArcaneWeaveScreen());
     }
 
+    public static void open(ItemStack stack) {
+        ArcaneWeaveScreen screen = new ArcaneWeaveScreen();
+        screen.codexStack = stack.copy();
+        Minecraft.getInstance().setScreen(screen);
+    }
+
     @Override
     protected void init() {
         super.init();
+
+        // Load spell data from NBT if available
+        String loadedSpellName = null;
+        if (!codexStack.isEmpty()) {
+            OverflowCodexItem.SpellData data = OverflowCodexItem.loadSpellFromNBT(codexStack);
+            if (data != null) {
+                spellGlyphs = data.glyphIds().clone();
+                loadedSpellName = data.spellName();
+                recalculateStats();
+            }
+        }
+
         int centerX = this.width / 2;
         canvasX = centerX - 120;
         canvasY = 30;
@@ -53,6 +74,9 @@ public class ArcaneWeaveScreen extends Screen {
         spellNameField = new EditBox(this.font, centerX - 60, this.height - 35, 120, 15,
                 Component.translatable("screen.overflow_codex.spell_name"));
         spellNameField.setMaxLength(32);
+        if (loadedSpellName != null) {
+            spellNameField.setValue(loadedSpellName);
+        }
         this.addRenderableWidget(spellNameField);
 
         this.addRenderableWidget(Button.builder(Component.translatable("screen.overflow_codex.save"),
@@ -114,13 +138,21 @@ public class ArcaneWeaveScreen extends Screen {
     private void renderGlyphPalette(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         int paletteY = canvasY + scrollBarHeight + 50;
         guiGraphics.drawString(this.font, "Glyph Palette:", canvasX, paletteY, 0xFFD700);
+        ModGlyphs.GlyphDef[] allGlyphs = ModGlyphs.ALL_GLYPHS;
         for (int i = 0; i < 20; i++) {
             int x = canvasX + (i % 10) * (SLOT_SIZE + SLOT_SPACING);
             int y = paletteY + 18 + (i / 10) * (SLOT_SIZE + SLOT_SPACING);
-            int glyphId = scrollOffset * 20 + i + 1;
+            int glyphIndex = scrollOffset * 20 + i;
             int c = isMouseInSlot(mouseX, mouseY, x, y) ? 0x4A3A5A : 0x1A1A3A;
             guiGraphics.fill(x, y, x + SLOT_SIZE, y + SLOT_SIZE, c);
-            guiGraphics.drawString(this.font, String.valueOf(glyphId), x + 5, y + 6, 0xAA88FF);
+            // Show glyph names for custom glyphs (indices 0-4), numbers for the rest
+            if (glyphIndex < allGlyphs.length) {
+                String name = allGlyphs[glyphIndex].displayName;
+                String abbr = name.length() > 3 ? name.substring(0, 3) : name;
+                guiGraphics.drawString(this.font, abbr, x + 2, y + 6, 0x00FFFF);
+            } else {
+                guiGraphics.drawString(this.font, String.valueOf(glyphIndex + 1), x + 5, y + 6, 0xAA88FF);
+            }
         }
     }
 
@@ -208,12 +240,31 @@ public class ArcaneWeaveScreen extends Screen {
         for (int g : spellGlyphs) {
             if (g != 0) glyphCount++;
         }
-        manaCostDisplay = glyphCount * glyphCount;
+        int scaling = OverflowCodexItem.calculateManaScaling(glyphCount);
+        manaCostDisplay = glyphCount * glyphCount * OverflowCodexItem.MANA_COST_MULTIPLIER * scaling;
         instabilityDisplay = OverflowCodexItem.calculateInstability(glyphCount, manaCostDisplay);
     }
 
     private void saveSpell() {
-        OverflowCodex.LOGGER.info("Saving spell: {}", spellNameField.getValue());
+        String spellName = spellNameField.getValue();
+        OverflowCodex.LOGGER.info("Saving spell: {}", spellName);
+
+        // Persist spell data to NBT
+        if (!codexStack.isEmpty()) {
+            OverflowCodexItem.saveSpellToNBT(codexStack, spellName, spellGlyphs,
+                    (int) java.util.Arrays.stream(spellGlyphs).filter(g -> g != 0).count());
+            // Update the player's held item with the new NBT
+            var player = Minecraft.getInstance().player;
+            if (player != null) {
+                for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+                    if (player.getInventory().getItem(i).sameItemStackIgnoreDurability(codexStack)) {
+                        player.getInventory().setItem(i, codexStack);
+                        break;
+                    }
+                }
+            }
+        }
+
         Minecraft.getInstance().setScreen(null);
     }
 
