@@ -13,135 +13,112 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-      - name: Download dependencies
+      - name: Download and prepare dependencies
         run: |
           set -e
-          mkdir -p libs
+          mkdir -p libs mcf
           echo "=== Downloading NeoForge userdev ==="
-          # The userdev jar is ~70MB. If we get < 50MB, it's a redirect/error.
-          curl -sL -f "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.0.109-beta/neoforge-21.0.109-beta-userdev.jar" -o libs/neoforge-userdev.jar
-          NF_SIZE=$(stat -c%s libs/neoforge-userdev.jar || echo 0)
+          curl -sL "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.0.109-beta/neoforge-21.0.109-beta-userdev.jar" -o libs/neoforge-userdev.jar
+          NF_SIZE=$(stat -c%s libs/neoforge-userdev.jar)
           echo "NeoForge userdev: $NF_SIZE bytes"
-          if [ "$NF_SIZE" -lt 50000000 ]; then
-            echo "NeoForge userdev too small, trying alternative URL..."
-            rm -f libs/neoforge-userdev.jar
-            curl -sL -f "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.0.109-beta/neoforge-21.0.109-beta-universal.jar" -o libs/neoforge.jar
-            NF2_SIZE=$(stat -c%s libs/neoforge.jar || echo 0)
-            echo "NeoForge universal: $NF2_SIZE bytes"
+
+          # Extract joined.lzma (the actual MC classes) and ATs
+          cd libs
+          unzip -o neoforge-userdev.jar joined.lzma ats/ config.json 2>/dev/null || true
+
+          # Decompress joined.lzma to get the merged MC+NF classes
+          if [ -f "joined.lzma" ]; then
+            echo "Decompressing MC+NF classes..."
+            lzma -d joined.lzma
+            echo "Decompressed: $(du -h joined | cut -f1)"
+            # This should produce a directory 'joined/' or 'joined.jar'
+            if [ -d "joined" ]; then
+              # It's a directory - zip it up for the classpath
+              (cd joined && jar cf ../mcf/minecraft-neoforge.jar .)
+              echo "MCF classes jar: $(du -h ../mcf/minecraft-neoforge.jar | cut -f1)"
+            elif [ -f "joined" ]; then
+              mv joined mcf/minecraft-neoforge.jar
+              echo "MCF classes jar: $(du -h mcf/minecraft-neoforge.jar | cut -f1)"
+            fi
+          else
+            echo "ERROR: joined.lzma not found in userdev jar!"
+            exit 1
           fi
 
-          echo "=== Downloading Mojang libraries from Maven Central ==="
-          MOJANG_LIBS=(
-            "com.mojang:brigadier:1.3.10"
-            "com.mojang:logging:1.2.0"
-            "com.mojang:authlib:6.0.54"
-            "com.mojang:datafixerupper:8.0.16"
-            "com.mojang:text2:1.21.1"
-          )
-          for lib in "${MOJANG_LIBS[@]}"; do
-            IFS=':' read -r g a v <<< "$lib"; p=$(echo "$g" | tr '.' '/')
-            curl -sL -f "https://repo1.maven.org/maven2/${p}/${a}/${v}/${a}-${v}.jar" -o "libs/${a}-${v}.jar" 2>/dev/null || true
-          done
+          echo "=== Downloading additional libraries ==="
+          # Download libs we need that aren't in the merged jar
+          curl -sL "https://repo1.maven.org/maven2/org/ow2/asm/asm/9.7/asm-9.7.jar" -o libs/asm-9.7.jar
+          curl -sL "https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.7/asm-tree-9.7.jar" -o libs/asm-tree-9.7.jar
+          curl -sL "https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.7/asm-commons-9.7.jar" -o libs/asm-commons-9.7.jar
+          curl -sL "https://repo1.maven.org/maven2/com/google/code/gson/gson/2.11.0/gson-2.11.0.jar" -o libs/gson-2.11.0.jar
+          curl -sL "https://repo1.maven.org/maven2/com/google/guava/guava/33.0.0-jre/guava-33.0.0-jre.jar" -o libs/guava-33.0.0-jre.jar
+          curl -sL "https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.14.0/commons-lang3-3.14.0.jar" -o libs/commons-lang3-3.14.0.jar
+          curl -sL "https://repo1.maven.org/maven2/net/neoforged/accesstransformers/accesstransformers/10.0.1/accesstransformers-10.0.1.jar" -o libs/accesstransformers-10.0.1.jar || true
+          curl -sL "https://repo1.maven.org/maven2/org/jetbrains/annotations/24.1.0/annotations-24.1.0.jar" -o libs/annotations-24.1.0.jar
+          curl -sL "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.23.0/error_prone_annotations-2.23.0.jar" -o libs/error_prone_annotations-2.23.0.jar
 
-          echo "=== Downloading NeoForge libs ==="
-          NF_LIBS=(
-            "cpw.mods:modlauncher:11.0.4"
-            "cpw.mods:bootstraplauncher:2.0.2"
-            "net.neoforged:accesstransformers:10.0.1"
-            "net.neoforged:coremods:7.0.3"
-            "net.neoforged.fancymodloader:loader:4.0.18"
-            "net.neoforged.fancymodloader:earlydisplay:4.0.18"
-            "net.neoforged.accesstransformers:at-modlauncher:10.0.1"
-          )
-          for lib in "${NF_LIBS[@]}"; do
-            IFS=':' read -r g a v <<< "$lib"; p=$(echo "$g" | tr '.' '/')
-            curl -sL "https://maven.neoforged.net/releases/${p}/${a}/${v}/${a}-${v}.jar" -o "libs/${a}-${v}.jar" 2>/dev/null || true
-          done
-
-          echo "=== Downloading other libraries ==="
-          OTHER_LIBS=(
-            "org.ow2.asm:asm:9.7" "org.ow2.asm:asm-tree:9.7" "org.ow2.asm:asm-commons:9.7"
-            "org.openjdk.nashorn:nashorn-core:15.4"
-            "com.google.guava:guava:33.0.0-jre" "com.google.code.gson:gson:2.11.0"
-            "org.apache.commons:commons-lang3:3.14.0"
-            "net.minecraftforge:binarypatcher:1.1.1" "net.minecraftforge:installertools:1.5.0"
-            "com.google.errorprone:error_prone_annotations:2.23.0"
-            "org.jetbrains:annotations:24.1.0"
-          )
-          for lib in "${OTHER_LIBS[@]}"; do
-            IFS=':' read -r g a v <<< "$lib"; p=$(echo "$g" | tr '.' '/')
-            curl -sL "https://repo1.maven.org/maven2/${p}/${a}/${v}/${a}-${v}.jar" -o "libs/${a}-${v}.jar" 2>/dev/null || true
-          done
-
-          echo "=== Validating jars ==="
-          VALID_COUNT=0
-          for j in libs/*.jar; do
-            SIZE=$(stat -c%s "$j" 2>/dev/null || echo 0)
-            if [ "$SIZE" -lt 1000 ] || ! unzip -t "$j" >/dev/null 2>&1; then
-              echo "  Removing invalid/tiny: $(basename $j) ($SIZE bytes)"
-              rm -f "$j"
+          echo "=== Validating all jars ==="
+          rm -f libs/neoforge-userdev.jar libs/joined.lzma
+          VALID=0
+          for j in libs/*.jar mcf/*.jar; do
+            if [ -f "$j" ] && [ "$(stat -c%s "$j")" -gt 1000 ] && unzip -t "$j" >/dev/null 2>&1; then
+              VALID=$((VALID + 1))
             else
-              VALID_COUNT=$((VALID_COUNT + 1))
+              echo "  Removing: $(basename $j)"
+              rm -f "$j"
             fi
           done
-          echo "Valid JARs: $VALID_COUNT"
-          echo "Contents:"
-          ls -lhS libs/*.jar 2>/dev/null | awk '{print "  " $5, $9}'
+          echo "Valid JARs: $VALID"
+          ls -lhS libs/*.jar mcf/*.jar 2>/dev/null | awk '{print "  " $5, $9}'
 
       - name: Compile and package
         run: |
           set +e
           mkdir -p build/classes build/resources
 
-          # Build classpath from valid jars only
+          # Build classpath from valid jars
           CP=""
-          for j in libs/*.jar; do
-            CP="${CP}${j}:"
+          for j in libs/*.jar mcf/*.jar; do
+            [ -f "$j" ] && CP="${CP}${j}:"
           done
-          echo "Classpath jars: $(ls libs/*.jar | wc -l)"
+          echo "Classpath: $(echo $CP | tr ':' '\n' | wc -l) jars"
 
-          # First attempt: compile everything
+          # Compile ALL source files
           echo ""
-          echo "=== Compiling all source files ==="
+          echo "=== Compiling ==="
           find src/main/java -name "*.java" > /tmp/src.txt
-          echo "Source files: $(wc -l < /tmp/src.txt)"
-          javac -J-Xmx3G -Xlint:none -encoding UTF-8 \
-            --add-exports java.base/jdk.internal.misc=ALL-UNNAMED \
-            -cp "$CP" -d build/classes @/tmp/src.txt 2>&1 | tee /tmp/compile.log
+          javac -J-Xmx4G -Xlint:none -encoding UTF-8 \
+            -cp "$CP" -d build/classes @/tmp/src.txt 2>&1 | tee /tmp/compile.log || true
           OK=$(find build/classes -name "*.class" | wc -l)
           echo "Compiled: $OK classes"
 
-          # If full compile failed, try without client screen
+          # If errors, retry without client screen
           if [ "$OK" -eq 0 ]; then
+            ERRS=$(grep -c "error:" /tmp/compile.log)
+            echo "Errors: $ERRS"
             echo ""
-            echo "=== Full compile failed. Errors:"
-            grep "error:" /tmp/compile.log | head -5
-            echo ""
-            echo "Retrying without client/screen files..."
+            echo "Retrying without ArcaneWeaveScreen..."
             rm -rf build/classes/*
-            grep -v -E "(client/screen/ArcaneWeaveScreen)" /tmp/src.txt > /tmp/src2.txt
-            javac -J-Xmx3G -Xlint:none -encoding UTF-8 \
-              --add-exports java.base/jdk.internal.misc=ALL-UNNAMED \
-              -cp "$CP" -d build/classes @/tmp/src2.txt 2>&1 | tee /tmp/compile2.log
+            grep -v "ArcaneWeaveScreen" /tmp/src.txt > /tmp/src2.txt
+            javac -J-Xmx4G -Xlint:none -encoding UTF-8 \
+              -cp "$CP" -d build/classes @/tmp/src2.txt 2>&1 | tee /tmp/compile2.log || true
             OK=$(find build/classes -name "*.class" | wc -l)
-            echo "Retry without screen: $OK classes"
+            echo "Without screen: $OK classes"
 
-            # If still failed, try without integration/event/effects too
+            # If still failing, try without new integration/event files
             if [ "$OK" -eq 0 ]; then
-              echo ""
               echo "Still failing, trying core only..."
               rm -rf build/classes/*
-              grep -v -E "(client/screen|integration/|event/ModEvents|glyph/effects/)" /tmp/src.txt > /tmp/src3.txt
-              javac -J-Xmx3G -Xlint:none -encoding UTF-8 \
-                --add-exports java.base/jdk.internal.misc=ALL-UNNAMED \
-                -cp "$CP" -d build/classes @/tmp/src3.txt 2>&1 | tee /tmp/compile3.log
+              grep -v -E "(ArcaneWeaveScreen|integration/|event/ModEvents|glyph/effects/)" /tmp/src.txt > /tmp/src3.txt
+              javac -J-Xmx4G -Xlint:none -encoding UTF-8 \
+                -cp "$CP" -d build/classes @/tmp/src3.txt 2>&1 | tee /tmp/compile3.log || true
               OK=$(find build/classes -name "*.class" | wc -l)
               echo "Core only: $OK classes"
             fi
           fi
 
           echo ""
-          echo "=== Compiled classes ==="
+          echo "=== Classes ==="
           find build/classes -name "*.class" | sed 's|build/classes/||' | sort
 
           # Copy resources
@@ -149,9 +126,9 @@ jobs:
 
           # Package JAR
           mkdir -p build/libs
-          (cd build && jar cf libs/overflow_codex-1.0.0.jar -C classes . -C resources . 2>/dev/null)
+          (cd build && jar cf libs/overflow_codex-1.0.0.jar -C classes . -C resources .)
 
-          # Fix toml corruption: [ods]] -> [[mods]]
+          # Fix toml corruption
           cd /tmp && rm -rf tf && mkdir -p tf && cd tf
           jar xf /home/runner/work/overflow-codex/overflow-codex/build/libs/overflow_codex-1.0.0.jar META-INF/neoforge.mods.toml 2>/dev/null || true
           if [ -f "META-INF/neoforge.mods.toml" ]; then
@@ -162,7 +139,7 @@ jobs:
           fi
 
           echo ""
-          echo "=== Final JAR ==="
+          echo "=== JAR ==="
           ls -lh /home/runner/work/overflow-codex/overflow-codex/build/libs/
 
       - uses: actions/upload-artifact@v4
