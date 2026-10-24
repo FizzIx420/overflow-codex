@@ -14,3 +14,8 @@
 - Build commands and source packaging steps were left unchanged; publication runs only after a successful non-PR build and only when a JAR exists.
 - The publisher embeds commit/run recovery metadata and file SHA-256 values, and retains the newest three successful CI releases.
 - Verification pending a successful Actions run; this tool session did not dispatch the workflow.
+
+## 2026-10-24: Fix release publisher step indentation
+
+- Corrected the indentation of the new local release-ZIP publisher step in `.github/workflows/build.yml` so it remains under the build job's `steps` list.
+- Build and packaging commands were not changed. YAML/runtime verification is pending a successful Actions run.
