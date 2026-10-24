@@ -41,3 +41,8 @@
 
 - Removed the redundant closing `fi` from the shared release publisher. Intermediate draft ZIPs and final published ZIPs now follow a syntactically balanced shell block.
 - The policy guard continues to prohibit Actions artifact uploads and require release ZIP publishing for build outputs. Runtime verification pending.
+
+## 2026-10-24: Correct release tag lookup delimiter escaping
+
+- Corrected the tab delimiter in the release-list lookup so `awk` compares the exact `ci-*` tag field and returns the matching release ID reliably.
+- This prevents the final publisher from failing while resolving a draft release. Runtime verification pending.
