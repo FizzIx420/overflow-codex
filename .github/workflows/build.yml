@@ -16,7 +16,6 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          distribution: 'zulu'
       - name: Build with Gradle
         uses: gradle/actions/setup-gradle@v4
         with:

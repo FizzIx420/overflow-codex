@@ -24,3 +24,9 @@
 
 - Added `.github/workflows/release-zip-policy-check.yml`, a read-only guard that checks future build workflows use the local release ZIP publisher and all temporary Actions artifact uploads set one-day retention.
 - The guard does not publish or delete artifacts. It will run automatically on the next push/PR; runtime verification is pending.
+
+## 2026-10-24: Repair pre-existing CI blocker discovered during release ZIP migration
+
+- Removed the duplicate Java distribution key that made the workflow invalid before any build job could start.
+- This was required for the new release ZIP publisher to be reachable; no build command or artifact path was changed.
+- The policy guard and release ZIP action remain in place. Verification pending the next Actions run.
