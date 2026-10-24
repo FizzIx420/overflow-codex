@@ -19,3 +19,8 @@
 
 - Corrected the indentation of the new local release-ZIP publisher step in `.github/workflows/build.yml` so it remains under the build job's `steps` list.
 - Build and packaging commands were not changed. YAML/runtime verification is pending a successful Actions run.
+
+## 2026-10-24: Enforce release ZIP policy for future build workflows
+
+- Added `.github/workflows/release-zip-policy-check.yml`, a read-only guard that checks future build workflows use the local release ZIP publisher and all temporary Actions artifact uploads set one-day retention.
+- The guard does not publish or delete artifacts. It will run automatically on the next push/PR; runtime verification is pending.
